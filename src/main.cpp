@@ -4,6 +4,49 @@
 
 LRESULT WINAPI Win32WindowsProc(HWND, UINT, WPARAM, LPARAM);
 
+#define BYTES_PER_PIXEL 4
+
+struct Win32ScreenBuffer
+{
+    BITMAPINFO info;
+    void *memory;
+    u32   width;
+    u32   height;
+    u32   pitch;
+
+    Win32ScreenBuffer(const u32 width, const u32 height) {
+        this->width  = width;
+        this->height = height;
+        this->pitch  = width*BYTES_PER_PIXEL;
+
+        info.bmiHeader.biSize = sizeof(info.bmiHeader);
+        info.bmiHeader.biWidth  = width;
+        info.bmiHeader.biHeight = -(i32)height;
+        info.bmiHeader.biPlanes = 1;
+        info.bmiHeader.biBitCount = 32;
+        info.bmiHeader.biCompression = BI_RGB;
+
+        this->memory = operator new(width*height*BYTES_PER_PIXEL);
+    }
+
+    ~Win32ScreenBuffer() {
+        operator delete(this->memory);
+    }
+
+    void Resize(const u32 w, const u32 h) {
+        this->width  = w;
+        this->height = h;
+        this->pitch  = width*BYTES_PER_PIXEL;
+
+        info.bmiHeader.biWidth  = w;
+        info.bmiHeader.biHeight = -(i32)height;
+
+        operator delete(this->memory);
+        this->memory = operator new(width*height*BYTES_PER_PIXEL);
+    }
+};
+
+static Win32ScreenBuffer *global_offscreen_buffer;
 static bool global_is_app_running;
 
 int WinMain(HINSTANCE instance, HINSTANCE ,
@@ -34,6 +77,7 @@ int WinMain(HINSTANCE instance, HINSTANCE ,
 
         if (window_handle)
         {
+            global_offscreen_buffer = new Win32ScreenBuffer(window_width, window_height);
             global_is_app_running = true;
             ShowWindow(window_handle, SW_SHOWDEFAULT);
             UpdateWindow(window_handle);
@@ -49,10 +93,16 @@ int WinMain(HINSTANCE instance, HINSTANCE ,
                     }
                 }
 
-
+                HDC dc = GetDC(window_handle);
+                StretchDIBits(dc,
+                              0, 0, 1280, 780,
+                              0, 0, global_offscreen_buffer->width, global_offscreen_buffer->height,
+                              global_offscreen_buffer->memory, &global_offscreen_buffer->info, DIB_RGB_COLORS, SRCCOPY);
+                ReleaseDC(window_handle, dc);
             }
 
             DestroyWindow(window_handle);
+            delete global_offscreen_buffer;
         }
         else
         {
@@ -98,6 +148,9 @@ LRESULT WINAPI Win32WindowsProc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_
             }
         }
 
+        static i32 pixel_x_position = 0;
+        static i32 pixel_y_position = 0;
+
         if(was_down != is_down)
         {
             if (is_down)
@@ -113,12 +166,49 @@ LRESULT WINAPI Win32WindowsProc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_
                 else
                 {
                     // TODO(Misael): Normal keys....
-
+                    switch (vkcode)
+                    {
+                    case VK_UP:
+                    {
+                        if (pixel_y_position > 0) { --pixel_y_position; }
+                    }
+                    break;
+                    case VK_DOWN:
+                    {
+                        if (pixel_y_position < 1280-1) { ++pixel_y_position; }
+                    }
+                    break;
+                    case VK_RIGHT:
+                    {
+                        if (pixel_x_position < 780-1) { ++pixel_x_position; }
+                    }
+                    break;
+                    case VK_LEFT:
+                    {
+                        if (pixel_x_position > 0) { --pixel_x_position; }
+                    }
+                    break;
+                    }
+                    u32 *pixel = (u32*)global_offscreen_buffer->memory;
+                    pixel[pixel_y_position*global_offscreen_buffer->width+pixel_x_position] = 0xFF0000FF;
                 }
             }
         }
 
 
+    }
+    break;
+    case WM_PAINT:
+    {
+        PAINTSTRUCT paint;
+        HDC dc = BeginPaint(handle, &paint);
+
+        StretchDIBits(dc,
+                      0, 0, 1280, 780,
+                      0, 0, global_offscreen_buffer->width, global_offscreen_buffer->height,
+                      global_offscreen_buffer->memory, &global_offscreen_buffer->info, DIB_RGB_COLORS, SRCCOPY);
+
+        EndPaint(handle, &paint);
     }
     break;
     case WM_CLOSE:

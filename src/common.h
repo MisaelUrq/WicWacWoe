@@ -16,6 +16,8 @@
 #define internal_var  static
 #define persist       static
 
+#define Assert(__EXPRESSION) if(!(__EXPRESSION)) {*(volatile int *)0 = 0;}
+
 typedef int8_t   i8;
 typedef int16_t  i16;
 typedef int32_t  i32;
@@ -30,6 +32,7 @@ typedef u32      b32;
 typedef wchar_t  wchar;
 typedef b32      bool32;
 typedef size_t   usize;
+typedef const char* str;
 
 #define Kilobytes(Value) ((Value)*1024LL)
 #define Megabytes(Value) (Kilobytes(Value)*1024LL)
@@ -40,14 +43,24 @@ typedef size_t   usize;
 #define INNER_FOR_RANGE(start, end) for(u32 inner_index = start; inner_index < end; ++inner_index)
 #define FOR_RANGE_J(start, end) for(u32 j = start; j < end; ++j)
 
+#define FOR_RANGE_I32(start, end) for(i32 index = start; index < end; ++index)
+
+
 #define ArrayCount(array)     sizeof(array) / sizeof(array[0])
 
-#define strlenwnull(str) strlen(str)+1;
+#define strlenwnull(str) strlen(str)+1
 
 struct v2u {
     u32 x;
     u32 y;
 };
+
+struct v2f {
+    f32 x;
+    f32 y;
+};
+
+#define IsRange(__VAR__, __MIN__, __MAX__) (__VAR__ >= __MIN__ && __VAR__ <= __MAX__)
 
 #ifdef __cplusplus
 typedef std::string String;

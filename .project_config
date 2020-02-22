@@ -1,5 +1,0 @@
-ProjectName = "WicWacWoe";
-Compiler = cl;
-CompilerFlags = "-W4 -Zi -EHsc";
-MainFile = "main.cpp";
-LinkLibs = "User32.lib Gdi32.lib";

@@ -46,9 +46,36 @@ struct Win32ScreenBuffer
     }
 };
 
-static Win32ScreenBuffer *global_offscreen_buffer;
-static bool global_is_app_running;
+struct PlatformScreenBuffer : Win32ScreenBuffer {
+    PlatformScreenBuffer(const u32 width, const u32 height) :
+        Win32ScreenBuffer(width, height)
+    {
+    }
+};
 
+struct Game {
+    PlatformScreenBuffer screen_buffer;
+
+    Game(u32 window_width, u32 window_height) :
+        screen_buffer(PlatformScreenBuffer(window_width, window_height))
+    {
+    }
+};
+
+void PlatformDrawLine(PlatformScreenBuffer* buffer, f32 x1, f32 y1, f32 x2, f32 y2)
+{
+    u32 *pixel = (u32*)buffer->memory;
+
+    const f32 m = (y2 - y1) / (x2 - x1);
+    const f32 b = y1 - m * x1;
+    FOR_RANGE((u32)x1, (u32)x2) {
+        f32 y = m * (f32)index + b;
+        pixel[(u32)y*buffer->width+index] = 0xFF00FF00;
+    }
+}
+
+global_var Win32ScreenBuffer *global_offscreen_buffer;
+global_var bool global_is_app_running;
 int WinMain(HINSTANCE instance, HINSTANCE ,
             LPSTR     , int      )
 {
@@ -77,7 +104,8 @@ int WinMain(HINSTANCE instance, HINSTANCE ,
 
         if (window_handle)
         {
-            global_offscreen_buffer = new Win32ScreenBuffer(window_width, window_height);
+            Game game = Game(window_width, window_height);
+            global_offscreen_buffer = &game.screen_buffer;
             global_is_app_running = true;
             ShowWindow(window_handle, SW_SHOWDEFAULT);
             UpdateWindow(window_handle);
@@ -92,6 +120,12 @@ int WinMain(HINSTANCE instance, HINSTANCE ,
                         DispatchMessage(&msg);
                     }
                 }
+
+                PlatformDrawLine(&game.screen_buffer, 0, 0,
+                                 game.screen_buffer.width, game.screen_buffer.height);
+
+                PlatformDrawLine(&game.screen_buffer, 0, game.screen_buffer.height,
+                                 game.screen_buffer.width, 0);
 
                 HDC dc = GetDC(window_handle);
                 StretchDIBits(dc,
@@ -119,8 +153,8 @@ int WinMain(HINSTANCE instance, HINSTANCE ,
     return 0;
 }
 
-static bool global_ctr_key_was_down;
 
+global_var bool global_ctr_key_was_down;
 LRESULT WINAPI Win32WindowsProc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param)
 {
     switch (msg)
@@ -148,9 +182,6 @@ LRESULT WINAPI Win32WindowsProc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_
             }
         }
 
-        static i32 pixel_x_position = 0;
-        static i32 pixel_y_position = 0;
-
         if(was_down != is_down)
         {
             if (is_down)
@@ -170,44 +201,34 @@ LRESULT WINAPI Win32WindowsProc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_
                     {
                     case VK_UP:
                     {
-                        if (pixel_y_position > 0) { --pixel_y_position; }
                     }
                     break;
                     case VK_DOWN:
                     {
-                        if (pixel_y_position < 1280-1) { ++pixel_y_position; }
                     }
                     break;
                     case VK_RIGHT:
                     {
-                        if (pixel_x_position < 780-1) { ++pixel_x_position; }
                     }
                     break;
                     case VK_LEFT:
                     {
-                        if (pixel_x_position > 0) { --pixel_x_position; }
                     }
                     break;
                     }
-                    u32 *pixel = (u32*)global_offscreen_buffer->memory;
-                    pixel[pixel_y_position*global_offscreen_buffer->width+pixel_x_position] = 0xFF0000FF;
                 }
             }
         }
-
-
     }
     break;
     case WM_PAINT:
     {
         PAINTSTRUCT paint;
         HDC dc = BeginPaint(handle, &paint);
-
         StretchDIBits(dc,
                       0, 0, 1280, 780,
                       0, 0, global_offscreen_buffer->width, global_offscreen_buffer->height,
                       global_offscreen_buffer->memory, &global_offscreen_buffer->info, DIB_RGB_COLORS, SRCCOPY);
-
         EndPaint(handle, &paint);
     }
     break;

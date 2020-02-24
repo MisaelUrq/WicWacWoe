@@ -2,6 +2,8 @@
 
 #include "common.h"
 
+#include <vector>
+
 LRESULT WINAPI Win32WindowsProc(HWND, UINT, WPARAM, LPARAM);
 
 #define BYTES_PER_PIXEL 4
@@ -25,7 +27,6 @@ struct Win32ScreenBuffer
         info.bmiHeader.biPlanes = 1;
         info.bmiHeader.biBitCount = 32;
         info.bmiHeader.biCompression = BI_RGB;
-
         this->memory = operator new(width*height*BYTES_PER_PIXEL);
     }
 
@@ -53,26 +54,109 @@ struct PlatformScreenBuffer : Win32ScreenBuffer {
     }
 };
 
-struct Game {
-    PlatformScreenBuffer screen_buffer;
+struct Line {
+    v2f p1;
+    v2f p2;
+};
 
-    Game(u32 window_width, u32 window_height) :
-        screen_buffer(PlatformScreenBuffer(window_width, window_height))
+struct Renderer {
+    PlatformScreenBuffer screen_buffer;
+    std::vector<Line>   lines;
+
+    Renderer(const u32 width, const u32 height) :
+        screen_buffer(PlatformScreenBuffer(width, height))
     {
+    }
+
+    void StartFrame() {
+        lines.clear();
+        Clear(0xFF111111);
+    }
+
+    // TODO(Misael): This really should not be this, this is more of a
+    // render call.
+    void EndFrame() {
+        for (auto iter = lines.begin(); iter != lines.end(); iter++) {
+            DrawLine(*iter);
+        }
+    }
+
+    void PushLine(v2f p1, v2f p2) {
+        lines.push_back({p1, p2});
+    }
+
+    // TODO(Misael): This method is not that great, lock for a beter
+    // one.
+    void DrawLine(const Line& line) {
+        PlatformScreenBuffer* buffer = &screen_buffer;
+        Assert(buffer->memory);
+        u32 *pixel = (u32*)buffer->memory;
+        const v2f *p1 = &line.p1;
+        const v2f *p2 = &line.p2;
+
+        f32 m = (p1->x != p2->x) ? (p2 ->y - p1->y) / (p2->x - p1->x) : 0.0f;
+
+        // TODO(Misael): Add color to this.
+        if (p1->x != p2->x && std::abs(m) <= 1.0f) {
+            if (p1->x > p2->x) {
+                std::swap(p1, p2);
+            }
+            const f32 b = p1->y - m * p1->x;
+            FOR_RANGE((u32)p1->x, (u32)p2->x) {
+                f32 y = m * (f32)index + b;
+                pixel[(u32)y*buffer->width+index] = 0xFF00FF00;
+            }
+        } else {
+            if (p1->y > p2->y) {
+                std::swap(p1, p2);
+            }
+            m = (p1->y != p2->y) ? (p2->x - p1->x) / (p2->y - p1->y) : 0.0f;
+            const f32 b = p1->x - m * p1->y;
+            FOR_RANGE((u32)p1->y, (u32)p2->y) {
+                f32 x = m * (f32)index + b;
+                pixel[index*buffer->width+(u32)x] = 0xFF00FF00;
+            }
+        }
+    }
+
+private:
+    // TODO(Misael): Use SIMD instrucctions to accelerate this.
+    void Clear(const u32 color) {
+        u32* pixel = (u32*)screen_buffer.memory;
+        for (u32 y = 0; y < screen_buffer.height; y++) {
+            for (u32 x = 0; x < screen_buffer.width; x++) {
+                *pixel = color;
+                pixel++;
+            }
+        }
     }
 };
 
-void PlatformDrawLine(PlatformScreenBuffer* buffer, f32 x1, f32 y1, f32 x2, f32 y2)
-{
-    u32 *pixel = (u32*)buffer->memory;
+struct Game {
+    Renderer renderer;
 
-    const f32 m = (y2 - y1) / (x2 - x1);
-    const f32 b = y1 - m * x1;
-    FOR_RANGE((u32)x1, (u32)x2) {
-        f32 y = m * (f32)index + b;
-        pixel[(u32)y*buffer->width+index] = 0xFF00FF00;
+    Game(u32 window_width, u32 window_height) :
+        renderer(Renderer(window_width, window_height))
+    {
     }
-}
+
+    void UpdateFrame() {
+        renderer.StartFrame();
+        PushBoard();
+        renderer.EndFrame();
+    }
+
+    void PushBoard() {
+        FOR_RANGE(0, 2) {
+            f32 y = (renderer.screen_buffer.height / 3.0f) * (f32)(index+1);
+            renderer.PushLine({0, y},{(f32)renderer.screen_buffer.width, y});
+        }
+        FOR_RANGE(0, 2) {
+            f32 x = (renderer.screen_buffer.width / 3.0f) * (f32)(index+1);
+            renderer.PushLine({(f32)x, 0} , {x, (f32)renderer.screen_buffer.height});
+        }
+    }
+};
 
 global_var Win32ScreenBuffer *global_offscreen_buffer;
 global_var bool global_is_app_running;
@@ -105,7 +189,7 @@ int WinMain(HINSTANCE instance, HINSTANCE ,
         if (window_handle)
         {
             Game game = Game(window_width, window_height);
-            global_offscreen_buffer = &game.screen_buffer;
+            global_offscreen_buffer = &game.renderer.screen_buffer;
             global_is_app_running = true;
             ShowWindow(window_handle, SW_SHOWDEFAULT);
             UpdateWindow(window_handle);
@@ -121,11 +205,7 @@ int WinMain(HINSTANCE instance, HINSTANCE ,
                     }
                 }
 
-                PlatformDrawLine(&game.screen_buffer, 0, 0,
-                                 game.screen_buffer.width, game.screen_buffer.height);
-
-                PlatformDrawLine(&game.screen_buffer, 0, game.screen_buffer.height,
-                                 game.screen_buffer.width, 0);
+                game.UpdateFrame();
 
                 HDC dc = GetDC(window_handle);
                 StretchDIBits(dc,
@@ -136,7 +216,6 @@ int WinMain(HINSTANCE instance, HINSTANCE ,
             }
 
             DestroyWindow(window_handle);
-            delete global_offscreen_buffer;
         }
         else
         {
@@ -152,7 +231,6 @@ int WinMain(HINSTANCE instance, HINSTANCE ,
 
     return 0;
 }
-
 
 global_var bool global_ctr_key_was_down;
 LRESULT WINAPI Win32WindowsProc(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param)

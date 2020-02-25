@@ -180,6 +180,7 @@ struct Game {
         this->current_position =  4;
         this->current_piece    =  1;
         this->is_game_done     =  false;
+        memset(board_pieces, 0, sizeof(board_pieces));
     }
 
     v2f GetPositionFromBoard(u32 position) {

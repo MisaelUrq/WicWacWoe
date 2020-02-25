@@ -20,12 +20,7 @@ struct PlatformInput {
     bool restart;
 
     PlatformInput() {
-        this->mouse_events   = 0;
-        this->is_down   =  false;
-        this->is_up     =  false;
-        this->is_left   =  false;
-        this->is_right  =  false;
-        this->spacebar  =  false;
+        memset(this, 0, sizeof(PlatformInput));
     }
 };
 
@@ -47,7 +42,6 @@ struct PlatformScreenBuffer
     ~PlatformScreenBuffer() {
         operator delete(this->memory);
     }
-
 
     virtual void Resize(const u32 w, const u32 h) {
         this->width  = w;
@@ -73,6 +67,7 @@ struct Win32ScreenBuffer : PlatformScreenBuffer
         info.bmiHeader.biCompression = BI_RGB;
     }
 
+    // TODO(Misael): Does this actually works?
     void Resize(const u32 w, const u32 h) override {
         PlatformScreenBuffer::Resize(w, h);
         info.bmiHeader.biWidth  = w;

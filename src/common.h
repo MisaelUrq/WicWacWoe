@@ -48,33 +48,10 @@ typedef const char* str;
 
 #define ArrayCount(array)     sizeof(array) / sizeof(array[0])
 
-#define strlenwnull(str) strlen(str)+1
-
 #define IsRange(__VAR__, __MIN__, __MAX__) (__VAR__ >= __MIN__ && __VAR__ <= __MAX__)
 
 #ifdef __cplusplus
 typedef std::string String;
-
-/* NOTE: I think some compilers have this function name already taken
- * in stdio.h, and it does the exact same thing. So it's only here for
- * the MSVC compiler, where I could't finded. But it has its
- * parameters in a diferent order so in a cpp compiler it would not
- * collide */
-static inline char *fgetdelim(FILE *file, char* buf, u32 count, const char delim)
-{
-    u32 i = 0;
-    while ( i < count-1 && fgets(&buf[i], 2, file)) {
-        if (feof(file)) {
-            buf[i] = 0;
-            return 0;
-        } else if (buf[i] == delim) {
-            i = 0;
-            return &buf[i];
-        }
-        i += 1;
-    }
-    return 0;
-}
 
 #endif
 

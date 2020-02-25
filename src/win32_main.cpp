@@ -95,8 +95,9 @@ struct Renderer {
         Clear(0xFF111111);
     }
 
-    // TODO(Misael): This really should not be this, this is more of a
-    // render call.
+    // TODO(Misael): This really should not be name like this, this is
+    // more of a render call. But maybe here it's when sorting or some
+    // other stuff can happen
     void EndFrame() {
         for (auto iter = lines.begin(); iter != lines.end(); iter++) {
             DrawLine(*iter);

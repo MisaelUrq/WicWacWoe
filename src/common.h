@@ -50,16 +50,6 @@ typedef const char* str;
 
 #define strlenwnull(str) strlen(str)+1
 
-struct v2u {
-    u32 x;
-    u32 y;
-};
-
-struct v2f {
-    f32 x;
-    f32 y;
-};
-
 #define IsRange(__VAR__, __MIN__, __MAX__) (__VAR__ >= __MIN__ && __VAR__ <= __MAX__)
 
 #ifdef __cplusplus

@@ -515,6 +515,8 @@ int WinMain(HINSTANCE instance, HINSTANCE ,
                 ReleaseDC(window_handle, dc);
             }
 
+            delete input;
+            delete global_offscreen_buffer;
             DestroyWindow(window_handle);
         }
         else

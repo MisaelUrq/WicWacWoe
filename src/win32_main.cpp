@@ -6,6 +6,16 @@
 
 LRESULT WINAPI Win32WindowsProc(HWND, UINT, WPARAM, LPARAM);
 
+v2u Win32GetWindowDimension(HWND window)
+{
+    v2u result = v2u(0, 0);
+    RECT rect;
+    GetClientRect(window, &rect);
+    result.x = (u32)(rect.right - rect.left);
+    result.y = (u32)(rect.bottom - rect.top);
+    return(result);
+}
+
 #define BYTES_PER_PIXEL 4
 
 struct PlatformInput {
@@ -128,7 +138,7 @@ struct Renderer {
         }
     }
 
-    // TODO(Misael): This method is not that great, lock for a beter
+    // TODO(Misael): This method is not that great, look for a beter
     // one.
     void DrawLine(const Line& line) {
         const v2f *p1 = &line.p1;
@@ -142,7 +152,8 @@ struct Renderer {
                 std::swap(p1, p2);
             }
             const f32 b = p1->y - m * p1->x;
-            FOR_RANGE((u32)p1->x, (u32)p2->x) {
+            const u32 start = (p1->x < 0.0f) ? 0 : (u32)p1->x;
+            FOR_RANGE(start, (u32)p2->x) {
                 f32 y = m * (f32)index + b;
                 DrawPoint((f32)index, y, line.color);
             }
@@ -152,7 +163,8 @@ struct Renderer {
             }
             m = (p1->y != p2->y) ? (p2->x - p1->x) / (p2->y - p1->y) : 0.0f;
             const f32 b = p1->x - m * p1->y;
-            FOR_RANGE((u32)p1->y, (u32)p2->y) {
+            const u32 start = (p1->y < 0.0f) ? 0 : (u32)p1->y;
+            FOR_RANGE(start, (u32)p2->y) {
                 f32 x = m * (f32)index + b;
                 DrawPoint(x, (f32)index, line.color);
             }
@@ -419,6 +431,8 @@ int WinMain(HINSTANCE instance, HINSTANCE ,
 
             while (global_is_app_running)
             {
+                v2u dimension = Win32GetWindowDimension(window_handle);
+
                 {
                     MSG msg = {};
                     while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
@@ -510,18 +524,22 @@ int WinMain(HINSTANCE instance, HINSTANCE ,
                         TranslateMessage(&msg);
                         DispatchMessage(&msg);
                     }
-                    POINT MouseP;
-                    GetCursorPos(&MouseP);
-                    ScreenToClient(window_handle, &MouseP);
-                    input->mouse_position = {(f32)MouseP.x, (f32)MouseP.y};
+                    POINT mouse_position;
+                    GetCursorPos(&mouse_position);
+                    ScreenToClient(window_handle, &mouse_position);
+                    f32 y = (mouse_position.y / (f32)(dimension.y)) * global_offscreen_buffer->height;
+                    f32 x = (mouse_position.x / (f32)(dimension.x)) * global_offscreen_buffer->width;
+
+                    input->mouse_position = {x, y};
                 }
 
                 game.UpdateLogic();
                 game.UpdateFrame();
 
                 HDC dc = GetDC(window_handle);
+
                 StretchDIBits(dc,
-                              0, 0, 1280, 780,
+                              0, 0, dimension.x, dimension.y,
                               0, 0, global_offscreen_buffer->width, global_offscreen_buffer->height,
                               global_offscreen_buffer->memory, &global_offscreen_buffer->info, DIB_RGB_COLORS, SRCCOPY);
                 ReleaseDC(window_handle, dc);
